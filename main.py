@@ -5,6 +5,7 @@ from langchain import hub
 from langchain_community.vectorstores import FAISS
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma
@@ -21,6 +22,14 @@ loader = DirectoryLoader(path="docs")
 
 documents = loader.load()
 
+
+template = """ Write an article similar to these UF Alligator Articles provided: 
+{context}
+Question: {question}
+"""
+prompt = ChatPromptTemplate.from_template(template)
+
+
 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 texts = text_splitter.split_documents(documents)
 embeddings = OpenAIEmbeddings()
@@ -31,5 +40,14 @@ docs = retriever.invoke("What did they say about the florida mens basketball tea
 
 print(docs)
 
-# print(llm.invoke([HumanMessage(content="Hi! I'm Rey. Write an article from the Florida Alligator newspaper about a recent alumni.")]))
+def format_docs(contents):
+    return "\n\n".join([d.page_content for d in contents])
 
+chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+
+print(chain.invoke("Make the article about new events at the University"))
